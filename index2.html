@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Колесо фортуны — AVTO PAPA kz</title>
+<style>
+  :root{
+    --bg1: #064e3b;
+    --bg2: #022c22;
+    --neon: #4efcff; /* контрастный неоновый цвет (cyan) для подсветки */
+    --accent: #22c55e;
+    --text: #e6f9ee;
+    --radius: 500px;
+  }
+
+  html,body{height:100%;margin:0}
+  body{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:radial-gradient(circle at center,var(--bg1) 0%,var(--bg2) 100%);
+    font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    overflow:hidden;
+    /* base subtle neon glow */
+    text-shadow: 0 0 6px rgba(78,252,255,0.06);
+  }
+
+  /* layout */
+  .page{
+    width:100%;
+    max-width:calc(var(--radius) + 80px);
+    padding:18px;
+    box-sizing:border-box;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+  }
+
+  /* wheel container responsive */
+  .wheel-wrap{
+    width:var(--radius);
+    max-width:90vw;
+    aspect-ratio:1/1;
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  canvas#wheel{
+    width:100%;
+    height:100%;
+    border-radius:50%;
+    display:block;
+    box-shadow:0 0 60px rgba(78,252,255,0.08) inset, 0 20px 60px rgba(2,6,23,0.6);
+    transition:transform .3s ease;
+  }
+
+  /* center button */
+  .center{
+    position:absolute;
+    left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    width:120px; height:120px;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(145deg,#065f46,#064e3b);
+    box-shadow: 0 12px 40px rgba(2,6,23,0.6), inset 0 0 18px rgba(0,0,0,0.45);
+    z-index:10;
+  }
+
+  .spin-btn{
+    border:0;border-radius:999px;padding:12px 20px;font-weight:800;cursor:pointer;
+    color:#04160f;background:linear-gradient(90deg,#10b981,#22c55e);
+    box-shadow:0 10px 30px rgba(34,197,94,0.28);
+    font-size:14px;
+    transition:transform .14s ease, box-shadow .14s ease;
+  }
+  .spin-btn:hover{transform:scale(1.06)}
+  .spin-btn:active{transform:scale(.98)}
+  .spin-btn[disabled]{opacity:.6;cursor:not-allowed;box-shadow:none}
+
+  /* modal (alert) */
+  .modal-backdrop{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:linear-gradient(rgba(0,0,0,0.55),rgba(0,0,0,0.65));
+    z-index:60;backdrop-filter: blur(4px);
+  }
+  .modal{
+    width:420px;max-width:92%;padding:20px;border-radius:14px;
+    background:linear-gradient(180deg,#072c22,#02342a);
+    border:2px solid rgba(78,252,255,0.08);
+    box-shadow:0 30px 80px rgba(2,6,23,0.7);
+    transform:translateY(12px) scale(.98);
+    opacity:0;
+  }
+  .modal.show{animation:modalIn .45s cubic-bezier(.2,.9,.25,1) forwards}
+  @keyframes modalIn{
+    0%{transform:translateY(12px) scale(.96);opacity:0}
+    60%{transform:translateY(-8px) scale(1.02);opacity:1}
+    100%{transform:translateY(0) scale(1);opacity:1}
+  }
+
+  .modal h2{
+    margin:0 0 8px;font-size:20px;color:#bbf7d0;font-weight:800;
+    text-shadow:0 0 10px var(--neon);
+  }
+  .modal p{
+    margin:0 0 16px;font-size:15px;color:var(--text);
+    text-shadow:0 0 8px var(--neon);
+  }
+  .modal .btn-row{display:flex;gap:10px;justify-content:center}
+  .btn{
+    padding:10px 16px;border-radius:10px;border:0;font-weight:700;cursor:pointer;
+  }
+  .btn-primary{background:linear-gradient(90deg,#10b981,#22c55e);color:#03140f;box-shadow:0 8px 24px rgba(34,197,94,0.22)}
+  .btn-secondary{background:linear-gradient(90deg,#475569,#64748b);color:#fff}
+
+  /* history button */
+  .history-btn{
+    position:fixed;right:18px;top:18px;background:transparent;border:1px solid rgba(78,252,255,0.12);
+    color:var(--text);padding:8px 12px;border-radius:10px;font-weight:700;cursor:pointer;
+    box-shadow:0 0 12px rgba(78,252,255,0.06);
+    z-index:70;font-size:13px;
+  }
+
+  /* history modal */
+  .history-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:70}
+  .history-box{background:linear-gradient(180deg,#023a2c,#012519);padding:18px;border-radius:12px;border:2px solid rgba(78,252,255,0.06);box-shadow:0 20px 60px rgba(2,6,23,0.6);max-width:88%;text-align:center}
+  .history-box h3{margin:0 0 8px;text-shadow:0 0 10px var(--neon)}
+  .history-box p{margin:0;font-size:15px;color:var(--text);text-shadow:0 0 8px var(--neon)}
+
+  /* helper note */
+  .note{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);font-size:13px;color:rgba(230,249,238,0.78);z-index:20;text-shadow:0 0 6px rgba(78,252,255,0.06)}
+
+  /* responsive: make fonts larger on small screens for readability */
+  @media (max-width:600px){
+    .modal{padding:18px}
+    .modal h2{font-size:22px}
+    .modal p{font-size:16px}
+    .spin-btn{font-size:16px;padding:14px 22px}
+    .center{width:130px;height:130px}
+    :root{--radius:420px}
+  }
+
+  @media (max-width:420px){
+    .modal h2{font-size:20px}
+    .modal p{font-size:15px}
+    .spin-btn{font-size:16px;padding:12px 18px}
+    :root{--radius:360px}
+  }
+</style>
+</head>
+<body>
+  <button class="history-btn" id="historyBtn">История</button>
+
+  <div class="page">
+    <div class="wheel-wrap">
+      <canvas id="wheel"></canvas>
+      <div class="center"><button id="spinBtn" class="spin-btn">КРУТИТЬ</button></div>
+    </div>
+  </div>
+
+  <!-- modal -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" id="modal">
+      <h2>Поздравляем!</h2>
+      <p id="modalPrize">Вы выиграли: —</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnNow">Сейчас поеду</button>
+        <button class="btn btn-secondary" id="btnLater">Пойду позже</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- history -->
+  <div class="history-backdrop" id="historyBackdrop">
+    <div class="history-box">
+      <h3>История</h3>
+      <p id="historyText">Вы ещё не участвовали.</p>
+      <div style="height:12px;"></div>
+      <button class="btn btn-secondary" id="closeHistory">Закрыть</button>
+    </div>
+  </div>
+
+<script>
+/* ======= Data & elements ======= */
+const ITEMS = [
+  "Бесплатный страховку от AVTO PAPA kz",
+  "Бесплатный кофе",
+  "Бесплатный сухой туман",
+  "Скидка на все сервисы AVTO PAPA kz",
+  "Туры в Турцию"
+];
+const FORBIDDEN = "Туры в Турцию";
+
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+const spinBtn = document.getElementById('spinBtn');
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modal = document.getElementById('modal');
+const modalPrize = document.getElementById('modalPrize');
+const btnNow = document.getElementById('btnNow');
+const btnLater = document.getElementById('btnLater');
+const historyBtn = document.getElementById('historyBtn');
+const historyBackdrop = document.getElementById('historyBackdrop');
+const historyText = document.getElementById('historyText');
+const closeHistory = document.getElementById('closeHistory');
+
+let DPR = window.devicePixelRatio || 1;
+
+/* ======= Canvas sizing for crisp rendering ======= */
+function sizeCanvas(){
+  // take container width
+  const wrap = document.querySelector('.wheel-wrap');
+  const w = Math.min(wrap.clientWidth, window.innerWidth * 0.92);
+  // set CSS size via canvas style, but actual buffer multiplied by DPR
+  canvas.style.width = w + 'px';
+  canvas.style.height = w + 'px';
+  canvas.width = Math.round(w * DPR);
+  canvas.height = Math.round(w * DPR);
+}
+sizeCanvas();
+window.addEventListener('resize', ()=>{
+  DPR = window.devicePixelRatio || 1;
+  sizeCanvas();
+  drawWheel(); // redraw with new size
+});
+
+/* ======= Draw wheel ======= */
+function drawWheel(){
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2, radius = Math.min(W,H)/2 - Math.round(12*DPR);
+  ctx.clearRect(0,0,W,H);
+
+  const count = ITEMS.length;
+  const sector = (2*Math.PI)/count;
+  for(let i=0;i<count;i++){
+    const start = -Math.PI/2 + i*sector;
+    const end = start + sector;
+    // color palette (rich)
+    const hue = (i * 62) % 360;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,radius,start,end);
+    ctx.closePath();
+    ctx.fillStyle = (ITEMS[i] === FORBIDDEN) ? `hsl(${hue} 30% 18%)` : `hsl(${hue} 75% 45%)`;
+    ctx.fill();
+    ctx.lineWidth = Math.round(3*DPR);
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+    ctx.stroke();
+
+    // label
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.rotate(start + sector/2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#e6f9ee';
+    // font size scaled by DPR
+    const fontSize = Math.round(14 * DPR);
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    // glow
+    ctx.shadowColor = '#4efcff';
+    ctx.shadowBlur = 12 * DPR;
+    let text = ITEMS[i];
+    // clamp text length roughly by characters
+    if(text.length > 28) text = text.slice(0, 26) + '...';
+    ctx.fillText(text, radius - Math.round(16*DPR), Math.round(6*DPR));
+    ctx.restore();
+  }
+}
+drawWheel();
+
+/* ======= Spin logic ======= */
+let isSpinning = false;
+let currentRotation = 0; // degrees, applied to canvas.style.transform
+
+function choosePrize(){
+  const allowed = ITEMS.filter(x=>x!==FORBIDDEN);
+  const prize = allowed[Math.floor(Math.random()*allowed.length)];
+  return prize;
+}
+
+function spin(){
+  if(isSpinning) return;
+  if(localStorage.getItem('hasSpun')) return; // double ensure
+  isSpinning = true;
+  spinBtn.disabled = true;
+
+  const prize = choosePrize();
+  const index = ITEMS.indexOf(prize);
+  const slice = 360 / ITEMS.length;
+  // target: land so that the chosen sector center is at top (-90deg)
+  const chosenCenter = -90 + (index + 0.5) * slice;
+  const rounds = 5 + Math.floor(Math.random()*3);
+  const targetRotation = rounds*360 - chosenCenter;
+
+  const startRotation = currentRotation;
+  const endRotation = startRotation + targetRotation;
+  const duration = 5200;
+  const startTime = performance.now();
+
+  function easeOut(t){ return 1 - Math.pow(1 - t, 5); }
+
+  function frame(now){
+    const t = Math.min(1, (now - startTime)/duration);
+    const eased = easeOut(t);
+    const val = startRotation + (endRotation - startRotation) * eased;
+    canvas.style.transform = `rotate(${val}deg)`;
+    if(t < 1) requestAnimationFrame(frame);
+    else {
+      currentRotation = endRotation % 360;
+      // small delay so rotation settles visually
+      setTimeout(()=> onFinish(prize), 500);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ======= After spin finishes ======= */
+function onFinish(prize){
+  // show modal with clean prize (no prefix)
+  modalPrize.textContent = `Вы выиграли: ${prize}`;
+  modalBackdrop.style.display = 'flex';
+  // add animation class
+  setTimeout(()=> modal.classList.add('show'), 10);
+  // Important: don't save yet — only after user presses a choice, per flow
+}
+
+/* ======= Close modal and store first prize + reload (block future spins) ======= */
+function saveAndReload(prize){
+  // store only firstPrize if not already set
+  if(!localStorage.getItem('firstPrize')){
+    localStorage.setItem('firstPrize', prize);
+  }
+  localStorage.setItem('hasSpun', 'true');
+  // hide modal
+  modal.classList.remove('show');
+  modalBackdrop.style.display = 'none';
+  // reload (per your request)
+  location.reload();
+}
+
+/* ======= Event handlers ======= */
+spinBtn.addEventListener('click', spin);
+
+btnNow.addEventListener('click', ()=>{
+  const full = modalPrize.textContent || '';
+  const prize = full.replace(/^Вы выиграли:\s*/i,'').trim();
+  saveAndReload(prize);
+});
+btnLater.addEventListener('click', ()=>{
+  const full = modalPrize.textContent || '';
+  const prize = full.replace(/^Вы выиграли:\s*/i,'').trim();
+  saveAndReload(prize);
+});
+
+// History logic: show only the first prize (if any)
+historyBtn.addEventListener('click', ()=>{
+  const p = localStorage.getItem('firstPrize');
+  historyText.textContent = p ? `Вы выиграли: ${p}` : 'Вы ещё не участвовали.';
+  historyBackdrop.style.display = 'flex';
+});
+closeHistory.addEventListener('click', ()=> historyBackdrop.style.display = 'none');
+
+// Close modal if pressed ESC (allow developer convenience)
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape'){
+    if(historyBackdrop.style.display === 'flex') historyBackdrop.style.display = 'none';
+    if(modalBackdrop.style.display === 'flex'){
+      // do not auto-dismiss modal to mimic alert? Here we allow ESC to close for dev/test
+      modal.classList.remove('show');
+      modalBackdrop.style.display = 'none';
+    }
+  }
+});
+
+/* ======= On load: lock spin if already used; also adjust UI text ======= */
+window.addEventListener('load', ()=>{
+  if(localStorage.getItem('hasSpun')){
+    spinBtn.disabled = true;
+    spinBtn.textContent = 'Вы уже участвовали';
+  } else {
+    // nothing to change
+  }
+});
+
+/* ======= Redraw wheel clean when page resized or DPR changed ======= */
+window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener?.('change', ()=>{
+  DPR = window.devicePixelRatio || 1;
+  sizeCanvas();
+  drawWheel();
+});
+
+</script>
+</body>
+</html>
